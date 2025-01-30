@@ -11,6 +11,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Product {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,15 +33,11 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Token> tokens = new ArrayList<>();
 
-    public enum TokenType {
-        ONE_ON_ONE, // 1:1
-        ONE_ON_TWO, // 1:2
-        BARTER      // Special barter sessions
-    }
-
-    public enum TokenExpirePolicy {
-        NONE,       // No expiration (e.g., single sessions)
-        ONE_MONTH,  // Expires 1 month after first use
-        TWO_MONTHS  // Expires 2 months after first use
+    public Product(String name, Double price, int tokenQty, TokenType tokenType, TokenExpirePolicy tokenExpirePolicy) {
+        this.name = name;
+        this.price = price;
+        this.tokenQty = tokenQty;
+        this.tokenType = tokenType;
+        this.tokenExpirePolicy = tokenExpirePolicy;
     }
 }

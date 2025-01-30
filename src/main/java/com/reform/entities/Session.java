@@ -9,6 +9,7 @@ import java.time.LocalDate;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Session {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,4 +27,10 @@ public class Session {
 
     @OneToOne(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
     private Token token;
+
+    public Session(LocalDate sessionDate, Client client, Instructor instructor) {
+        this.sessionDate = sessionDate;
+        this.client = client;
+        this.instructor = instructor;
+    }
 }

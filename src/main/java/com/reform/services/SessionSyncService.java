@@ -2,11 +2,13 @@ package com.reform.services;
 
 import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.model.Event;
+import com.google.api.services.calendar.model.EventDateTime;
 import com.reform.entities.Client;
 import com.reform.entities.Instructor;
-import com.reform.entities.Session;
+import com.reform.entities.Product;
 import com.reform.repositories.ClientRepository;
 import com.reform.repositories.InstructorRepository;
+import com.reform.repositories.ProductRepository;
 import com.reform.repositories.SessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -27,6 +30,9 @@ public class SessionSyncService {
     private final ClientRepository clientRepository;
     private final InstructorRepository instructorRepository;
     private final SessionRepository sessionRepository;
+    private final ProductRepository productRepository;
+    private final TokenService tokenService;
+    private final ProductService productService;
 
     @Value("${google.calendar.carmen.id}")
     private String carmenCalendarId;
@@ -61,7 +67,7 @@ public class SessionSyncService {
                     .orElseGet(() -> instructorRepository.save(new Instructor(instructorName)));
 
             for (Event event : events) {
-                processEvent(event, instructor);
+                processEvent(event, instructor.getName());
             }
 
         } catch (Exception e) {
@@ -69,28 +75,62 @@ public class SessionSyncService {
         }
     }
 
-    private void processEvent(Event event, Instructor instructor) {
-        String clientName = event.getSummary(); // Assuming client name is in the event title
-        LocalDate sessionDate = Instant.ofEpochMilli(event.getStart().getDateTime().getValue())
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate();
 
-        Client client = clientRepository.findByFirstName(clientName)
-                .orElseGet(() -> {
-                    Client newClient = new Client();
-                    newClient.setFirstName(clientName);
-                    return clientRepository.save(newClient);
-                });
+    public void processEvent(Event event, String instructorName) {
+        String clientName = event.getSummary(); // Event title is the client's name
+        String description = event.getDescription(); // Event description contains subscription info
 
-        // Check if session already exists
-        if (!sessionRepository.existsByClientAndSessionDate(client, sessionDate)) {
-            Session session = new Session();
-            session.setClient(client);
-            session.setInstructor(instructor);
-            session.setSessionDate(sessionDate);
-            sessionRepository.save(session);
+        // Extract the session date
+        EventDateTime eventDateTime = event.getStart();
+        DateTime dateTime = eventDateTime.getDateTime() != null ? eventDateTime.getDateTime() : eventDateTime.getDate();
+        LocalDate sessionDate = Instant.ofEpochMilli(dateTime.getValue()).atZone(ZoneId.systemDefault()).toLocalDate();
 
-            log.info("Added new session: Client {} with Instructor {} on {}", clientName, instructor.getName(), sessionDate);
+        log.info("📅 Processing session for client: {} on {}", clientName, sessionDate);
+
+        // Fetch or create client
+        Client client = clientRepository.findByName(clientName)
+                .orElseGet(() -> clientRepository.save(new Client(clientName)));
+
+        // Fetch or create instructor
+        Instructor instructor = instructorRepository.findByName(instructorName)
+                .orElseGet(() -> instructorRepository.save(new Instructor(instructorName)));
+
+        // Detect if this is a new subscription
+        if (description != null && description.toLowerCase().contains("start abonament")) {
+            log.info("📜 New subscription detected for {}", clientName);
+            handleNewSubscription(client, description, sessionDate);
         }
+
+        // Ensure client has tokens before deducting
+        if (!tokenService.hasAvailableTokens(client)) {
+            log.warn("⚠️ Client {} has NO available tokens! Cannot deduct a token.", clientName);
+            return;
+        }
+
+        // Deduct token for this session
+        tokenService.deductToken(client, sessionDate);
+
+
+
+        // Add session to instructor
+        instructor.getSessions().add(sessionRepository.save(new com.reform.entities.Session(sessionDate, client, instructor)));
+
+        log.info("✅ Session recorded for client {} on {}. Token deducted.", clientName, sessionDate);
+    }
+
+    private void handleNewSubscription(Client client, String description, LocalDate sessionDate) {
+        String subscriptionName = extractSubscriptionName(description);
+
+        Optional<Product> optionalProduct = productService.getProductPriceAtTheStartOfSubscription(subscriptionName, sessionDate);
+        if (optionalProduct.isPresent()) {
+            tokenService.generateTokensForClient(client, optionalProduct.get());
+            log.info("🎟️ Generated tokens for client {} for subscription {}", client.getName(), subscriptionName);
+        } else {
+            log.error("❌ No matching product found for: {}", subscriptionName);
+        }
+    }
+
+    private String extractSubscriptionName(String description) {
+        return description.replace("Start abonament ", "").trim();
     }
 }

@@ -1,6 +1,7 @@
 package com.reform;
 
 import com.reform.services.SessionSyncService;
+import com.reform.services.TokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -12,6 +13,8 @@ public class Application implements CommandLineRunner {
 
     private final SessionSyncService sessionSyncService;
 
+    private final TokenService tokenService;
+
     public static void main(String[] args) {
         // Initialize Spring application context
         SpringApplication.run(Application.class, args);
@@ -21,6 +24,7 @@ public class Application implements CommandLineRunner {
     public void run(String... args) {
         System.out.println("Starting Google Calendar Sync...");
         sessionSyncService.syncSessionsFromGoogleCalendar();
+        tokenService.warnExpiringTokens();
         System.out.println("Google Calendar Sync Completed.");
     }
 }

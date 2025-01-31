@@ -16,13 +16,16 @@ public class Instructor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name;
-    private String googleCalendarId; // Google Calendar ID for syncing sessions
-
     @OneToMany(mappedBy = "instructor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Session> sessions = new ArrayList<>();
 
+    private String name;
+
     public Instructor(String name) {
         this.name = name;
+    }
+
+    public void addSession(Session session) {
+        sessions.add(session);
     }
 }

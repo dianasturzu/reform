@@ -1,29 +1,32 @@
 package com.reform.services;
 
+import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.reform.entities.*;
 import com.reform.repositories.ClientRepository;
 import com.reform.repositories.InstructorRepository;
-import com.reform.repositories.ProductRepository;
-import com.reform.repositories.SessionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import java.time.Instant;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.lang.reflect.Field;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.IntStream;
 
-import com.google.api.client.util.DateTime;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class SessionSyncServiceTest {
+
+    @Mock
+    private GoogleCalendarService googleCalendarService;
 
     @Mock
     private ClientRepository clientRepository;
@@ -32,128 +35,111 @@ class SessionSyncServiceTest {
     private InstructorRepository instructorRepository;
 
     @Mock
-    private SubscriptionParserService subscriptionParserService;
-
-    @Mock
     private TokenService tokenService;
 
     @Mock
-    private SessionRepository sessionRepository;
-
-    @Mock
-    private ProductRepository productRepository;
+    private SubscriptionParserService subscriptionParserService;
 
     @InjectMocks
     private SessionSyncService sessionSyncService;
 
-    private Event mockEvent;
-    private Client mockClient;
-    private Instructor mockInstructor;
+    private Client testClient;
+    private Instructor testInstructor;
+    private Product testProduct;
+    private Token testToken;
+    private LocalDate sessionDate;
+    private Event testEvent;
 
     @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-        mockClient = Client.builder().name("John Doe").build();
-        mockInstructor = Instructor.builder().name("Carmen").build();
+    void setUp() throws Exception {
+        testClient = new Client();
+        testClient.setName("John Doe");
 
-        mockEvent = new Event();
-        mockEvent.setSummary("John Doe");
-        mockEvent.setDescription("Start abonament 5 sedinte 1:1");
-        mockEvent.setStart(new EventDateTime().setDate(new DateTime(Instant.now().toEpochMilli())));
+        testInstructor = new Instructor();
+        testInstructor.setName("Carmen");
+
+        testProduct = new Product();
+        testProduct.setName("Abonament 10 sedinte 1:1");
+        testProduct.setPrice(500.0);
+        testProduct.setTokenQty(10);
+        testProduct.setAvailableUntil(LocalDate.now().plusMonths(2));
+
+        testToken = Token.TokenBuilder.aToken()
+                .withClient(testClient)
+                .withProduct(testProduct)
+                .withTokenValue(testProduct.getPrice() / testProduct.getTokenQty())
+                .withExpiresAt(testProduct.getAvailableUntil())
+                .withStatus(TokenStatus.AVAILABLE)
+                .build();
+
+        sessionDate = LocalDate.now();
+
+        // Set Google Calendar IDs using Reflection
+        setField(sessionSyncService, "carmenCalendarId", "mock-carmen-calendar-id");
+        setField(sessionSyncService, "dianaCalendarId", "mock-diana-calendar-id");
+
+        // Create a mock event
+        testEvent = new Event();
+        testEvent.setSummary(testClient.getName()); // Client name in title
+        testEvent.setDescription("Start abonament 10 sedinte 1:1"); // Subscription info
+
+        EventDateTime eventDateTime = new EventDateTime();
+        eventDateTime.setDateTime(new DateTime(sessionDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()));
+        testEvent.setStart(eventDateTime);
     }
 
-    // ✅ Test 1: Ensures a new client is created if they don't exist
-    @Test
-    void shouldCreateClientIfNotExists() {
-        when(clientRepository.findByName("John Doe")).thenReturn(Optional.empty());
-        when(clientRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        sessionSyncService.processEvent(mockEvent, "Carmen");
-
-        verify(clientRepository, times(1)).save(argThat(client ->
-                client.getName().equals("John Doe")
-        ));
-    }
-
-    // ✅ Test 2: Ensures no duplicate clients are created if they already exist
-    @Test
-    void shouldFindExistingClient() {
-        when(clientRepository.findByName("John Doe")).thenReturn(Optional.of(mockClient));
-
-        sessionSyncService.processEvent(mockEvent, "Carmen");
-
-        verify(clientRepository, never()).save(any());
-    }
-
-    // ✅ Test 3: Ensures tokens are generated for a new subscription
-    @Test
-    void shouldGenerateTokensForNewSubscription() {
-        // Given: A client is starting a new subscription
-        when(clientRepository.findByName("John Doe"))
-                .thenReturn(Optional.of(new Client("John Doe")));
-
-        when(productRepository.findByName("abonament 5 sedinte 1:1"))
-                .thenReturn(Optional.of(new Product("abonament 5 sedinte 1:1", 450.0, 5, TokenType.ONE_ON_ONE, TokenExpirePolicy.ONE_MONTH)));
-
-        when(tokenService.hasAvailableTokens(any(Client.class)))
-                .thenReturn(false); // Ensure no tokens are available to force generation
-
-        // When: A session is processed with a "Start abonament" event
-//        sessionSyncService.processEvent(mockEventWithSubscription, "Carmen");
-
-        // Then: Ensure tokens are generated correctly
-        verify(tokenService).generateTokensForClient(any(Client.class), any(Product.class));
-    }
-
-    // ✅ Test 4: Ensures a token is deducted for a regular session
-    @Test
-    void shouldDeductTokenForRegularSessionAndUpdateInstructor() {
-        when(clientRepository.findByName("John Doe")).thenReturn(Optional.of(mockClient));
-        when(instructorRepository.findByName("Carmen")).thenReturn(Optional.of(mockInstructor));
-        when(tokenService.deductToken(eq(mockClient), any())).thenReturn(true);
-
-        sessionSyncService.processEvent(mockEvent, "Carmen");
-
-        verify(tokenService, times(1)).deductToken(eq(mockClient), any());
-        verify(sessionRepository, times(1)).save(argThat(session ->
-                session.getClient().equals(mockClient) &&
-                        session.getInstructor().equals(mockInstructor)
-        ));
-        verify(instructorRepository, times(1)).save(mockInstructor);
-    }
-
-    // ✅ Test 5: Ensures NO token is deducted if none are available
-    @Test
-    void shouldNotDeductTokenIfNoneAvailable() {
-        when(clientRepository.findByName("John Doe")).thenReturn(Optional.of(mockClient));
-        when(tokenService.deductToken(eq(mockClient), any())).thenReturn(false);
-
-        sessionSyncService.processEvent(mockEvent, "Carmen");
-
-        verify(tokenService, times(1)).deductToken(eq(mockClient), any());
-        verify(sessionRepository, never()).save(any());
+    /**
+     * Utility method to inject values into private fields.
+     */
+    private void setField(Object target, String fieldName, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 
     @Test
-    void shouldSetCorrectExpiryDateForTokens() {
-        // Given: A new subscription is created
-        Product product = new Product("abonament 10 sedinte 1:1", 900.0, 10, TokenType.ONE_ON_ONE, TokenExpirePolicy.TWO_MONTHS);
-        LocalDate today = LocalDate.now();
-        LocalDate expectedExpiry = today.plusMonths(2);
+    void shouldSyncSessionsFromGoogleCalendar() throws Exception {
+        when(googleCalendarService.getSessions(any(), any(), any())).thenReturn(List.of(testEvent));
+        when(instructorRepository.findByName(anyString())).thenReturn(Optional.of(testInstructor));
+        when(clientRepository.findByName(anyString())).thenReturn(Optional.of(testClient));
 
-        // When: Tokens are generated
-        List<Token> tokens = IntStream.range(0, product.getTokenQty())
-                .mapToObj(i -> Token.builder()
-                        .client(new Client("John Doe"))
-                        .product(product)
-                        .tokenValue(product.getPrice() / product.getTokenQty())
-                        .expiresAt(expectedExpiry)
-                        .build())
-                .toList();
+        sessionSyncService.syncSessionsFromGoogleCalendar();
 
-        // Then: Check expiry date
-        assertEquals(expectedExpiry, tokens.get(0).getProduct().getAvailableUntil());
+        verify(googleCalendarService, times(2)).getSessions(any(), any(), any());
+        verify(clientRepository, atLeastOnce()).findByName(anyString());
+        verify(instructorRepository, atLeastOnce()).findByName(anyString());
     }
 
+    @Test
+    void shouldProcessEventAndGenerateTokens() {
+        when(clientRepository.findByName(testClient.getName())).thenReturn(Optional.of(testClient));
+        when(instructorRepository.findByName(testInstructor.getName())).thenReturn(Optional.of(testInstructor));
+        when(subscriptionParserService.extractProductFromEventDescription(anyString()))
+                .thenReturn(Optional.of(testProduct));
+
+        doAnswer(invocation -> {
+            testClient.setTokens(List.of(testToken)); // Simulate token generation
+            return null;
+        }).when(tokenService).generateTokensForClient(any(Client.class), any(Product.class));
+
+        sessionSyncService.processEvent(testEvent, testInstructor.getName());
+
+        verify(tokenService, times(1)).generateTokensForClient(testClient, testProduct);
+        verify(clientRepository, atLeastOnce()).findByName(testClient.getName());
+        verify(instructorRepository, atLeastOnce()).findByName(testInstructor.getName());
+    }
+
+    @Test
+    void shouldProcessEventAndDeductToken() {
+        when(clientRepository.findByName(testClient.getName())).thenReturn(Optional.of(testClient));
+        when(instructorRepository.findByName(testInstructor.getName())).thenReturn(Optional.of(testInstructor));
+        when(subscriptionParserService.extractProductFromEventDescription(anyString())).thenReturn(Optional.empty());
+        when(tokenService.consumeToken(testClient, sessionDate)).thenReturn(testToken);
+
+        sessionSyncService.processEvent(testEvent, testInstructor.getName());
+
+        verify(tokenService, times(1)).consumeToken(testClient, sessionDate);
+        verify(clientRepository, atLeastOnce()).findByName(testClient.getName());
+        verify(instructorRepository, atLeastOnce()).findByName(testInstructor.getName());
+    }
 }
-

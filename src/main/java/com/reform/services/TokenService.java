@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.IntStream;
 
 @Service
@@ -43,12 +44,15 @@ public class TokenService {
             extendTokens(client);
         }
 
-        Token tokenUsed = clientAvailableTokens.stream().findFirst().get();
-        tokenUsed.setUsedAt(sessionDate);
-        tokenUsed.setStatus(TokenStatus.USED);
+        Optional<Token> tokenUsed = clientAvailableTokens.stream().findFirst();
+        if(tokenUsed.isPresent()) {
+            Token token = tokenUsed.get();
+            token.setUsedAt(sessionDate);
+            token.setStatus(TokenStatus.USED);
+            log.info("✅ Token consumed for client {} on {}", client.getName(), sessionDate);
+        }
 
-        log.info("✅ Token consumed for client {} on {}", client.getName(), sessionDate);
-        return tokenUsed;
+        return tokenUsed.orElse(null);
     }
 
     private void extendTokens(Client client) {
@@ -56,19 +60,6 @@ public class TokenService {
         tokens.forEach(token -> token.setExpiresAt(token.getExpiresAt().plusDays(7)));
         tokenRepository.saveAll(tokens);
         log.info("📅 Extended all tokens for {} by 7 days.", client.getName());
-    }
-
-
-    // 🔹 Check if Token is Still Valid
-    private boolean isValidForUse(Token token, LocalDate sessionDate) {
-        return (token.getProduct().getAvailableFrom() == null || !sessionDate.isAfter(token.getProduct().getAvailableUntil()));
-    }
-
-    /**
-     * Checks if a client has at least one available token.
-     */
-    public boolean hasAvailableTokens(Client client) {
-        return tokenRepository.countAvailableTokens(client) > 0;
     }
 
     public void warnExpiringTokens() {

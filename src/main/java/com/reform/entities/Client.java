@@ -24,6 +24,10 @@ public class Client {
     @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Token> tokens = new ArrayList<>();
 
+    public void addSession(Session session) {
+        this.sessions.add(session);
+    }
+
     public Client(String name) {
         this.name = name;
     }

@@ -28,9 +28,10 @@ public class Session {
     @OneToOne(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
     private Token token;
 
-    public Session(LocalDate sessionDate, Client client, Instructor instructor) {
+    public Session(LocalDate sessionDate, Client client, Instructor instructor, Token token) {
         this.sessionDate = sessionDate;
         this.client = client;
         this.instructor = instructor;
+        this.token = token;
     }
 }

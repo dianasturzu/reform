@@ -6,10 +6,11 @@ import com.google.api.services.calendar.model.EventDateTime;
 import com.reform.entities.Client;
 import com.reform.entities.Instructor;
 import com.reform.entities.Product;
+import com.reform.entities.Session;
+import com.reform.entities.Token;
+import com.reform.entities.TokenStatus;
 import com.reform.repositories.ClientRepository;
 import com.reform.repositories.InstructorRepository;
-import com.reform.repositories.ProductRepository;
-import com.reform.repositories.SessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,10 +30,8 @@ public class SessionSyncService {
     private final GoogleCalendarService googleCalendarService;
     private final ClientRepository clientRepository;
     private final InstructorRepository instructorRepository;
-    private final SessionRepository sessionRepository;
-    private final ProductRepository productRepository;
     private final TokenService tokenService;
-    private final ProductService productService;
+    private final SubscriptionParserService subscriptionParserService;
 
     @Value("${google.calendar.carmen.id}")
     private String carmenCalendarId;
@@ -95,42 +94,37 @@ public class SessionSyncService {
         Instructor instructor = instructorRepository.findByName(instructorName)
                 .orElseGet(() -> instructorRepository.save(new Instructor(instructorName)));
 
-        // Detect if this is a new subscription
-        if (description != null && description.toLowerCase().contains("start abonament")) {
-            log.info("📜 New subscription detected for {}", clientName);
-            handleNewSubscription(client, description, sessionDate);
-        }
+        Optional<Product> productOpt = subscriptionParserService.extractProductFromEventDescription(description);
 
-        // Ensure client has tokens before deducting
-        if (!tokenService.hasAvailableTokens(client)) {
-            log.warn("⚠️ Client {} has NO available tokens! Cannot deduct a token.", clientName);
-            return;
-        }
+        if (productOpt.isPresent()) {
+            // Client purchased a new subscription
+            Product product = productOpt.get();
+            tokenService.generateTokensForClient(client, product);
 
-        // Deduct token for this session
-        tokenService.deductToken(client, sessionDate);
+            // Fetch the newly generated first token (Assumes tokens are ordered)
+            Token firstToken = client.getTokens().stream().findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Tokens should have been generated but were not found"));
 
+            firstToken.setUsedAt(sessionDate);
+            firstToken.setStatus(TokenStatus.USED);
 
+            // Create a session and link to the first available token
+            Session session = new Session(sessionDate, client, instructor, firstToken);
+            client.addSession(session);
+            instructor.addSession(session);
 
-        // Add session to instructor
-        instructor.getSessions().add(sessionRepository.save(new com.reform.entities.Session(sessionDate, client, instructor)));
+            log.info("✅ New subscription started for client {}. First session recorded.", client.getName());
 
-        log.info("✅ Session recorded for client {} on {}. Token deducted.", clientName, sessionDate);
-    }
-
-    private void handleNewSubscription(Client client, String description, LocalDate sessionDate) {
-        String subscriptionName = extractSubscriptionName(description);
-
-        Optional<Product> optionalProduct = productService.getProductPriceAtTheStartOfSubscription(subscriptionName, sessionDate);
-        if (optionalProduct.isPresent()) {
-            tokenService.generateTokensForClient(client, optionalProduct.get());
-            log.info("🎟️ Generated tokens for client {} for subscription {}", client.getName(), subscriptionName);
         } else {
-            log.error("❌ No matching product found for: {}", subscriptionName);
+            // Client is using an existing token
+            Token consumedToken = tokenService.consumeToken(client, sessionDate);
+            Session session = new Session(sessionDate, client, instructor, consumedToken);
+
+            client.addSession(session);
+            instructor.addSession(session);
+
+            log.info("✅ Session recorded for client {} on {}. Token deducted.", clientName, sessionDate);
         }
     }
 
-    private String extractSubscriptionName(String description) {
-        return description.replace("Start abonament ", "").trim();
-    }
 }

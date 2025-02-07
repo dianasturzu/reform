@@ -1,0 +1,6 @@
+name,price,tokenqty,tokentype,tokenexpirepolicy,availablefrom,availableuntil
+sedinta 1:1,120.00,1,ONE_ON_ONE,NONE,2025-02-01,2025-02-28
+sedinta 1:2,100.00,1,ONE_ON_TWO,NONE,2025-02-01,2025-02-28
+abonament 5 sedinte 1:1,500.00,5,ONE_ON_ONE,ONE_MONTH,2025-02-01,2025-02-28
+abonament 5 sedinte 1:2,375.00,5,ONE_ON_TWO,ONE_MONTH,2025-02-01,2025-02-28
+abonament 10 sedinte 1:1,1000.00,10,ONE_ON_ONE,TWO_MONTHS,2025-02-01,2025-02-28

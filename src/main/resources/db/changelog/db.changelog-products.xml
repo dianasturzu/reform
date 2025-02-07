@@ -5,86 +5,30 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
-    <changeSet id="populate-products" author="vlad">
-        <insert tableName="product">
-            <column name="name" value="1 sedinta 1:1"/>
-            <column name="price" value="100.00"/>
-            <column name="tokenqty" value="1"/>
-            <column name="tokentype" value="ONE_ON_ONE"/>
-            <column name="tokenexpirepolicy" value="NONE"/>
-            <column name="availablefrom" value="2025-01-01"/>
-            <column name="availableuntil" value="2025-01-31"/>
-        </insert>
+    <changeSet id="populate-jan-products-from-csv" author="vlad">
+        <delete tableName="product"/>  <!-- Optional: Clears old data before inserting new rows -->
 
-        <insert tableName="product">
-            <column name="name" value="1 sedinta 1:2"/>
-            <column name="price" value="85.00"/>
-            <column name="tokenqty" value="1"/>
-            <column name="tokentype" value="ONE_ON_TWO"/>
-            <column name="tokenexpirepolicy" value="NONE"/>
-            <column name="availablefrom" value="2025-01-01"/>
-            <column name="availableuntil" value="2025-01-31"/>
-        </insert>
-
-        <insert tableName="product">
-            <column name="name" value="Abonament 5 ședințe 1:1"/>
-            <column name="price" value="450.00"/>
-            <column name="tokenqty" value="5"/>
-            <column name="tokentype" value="ONE_ON_ONE"/>
-            <column name="tokenexpirepolicy" value="ONE_MONTH"/>
-            <column name="availablefrom" value="2025-01-01"/>
-            <column name="availableuntil" value="2025-01-31"/>
-        </insert>
-
-        <insert tableName="product">
-            <column name="name" value="Abonament 5 ședințe 1:2"/>
-            <column name="price" value="375.00"/>
-            <column name="tokenqty" value="5"/>
-            <column name="tokentype" value="ONE_ON_TWO"/>
-            <column name="tokenexpirepolicy" value="ONE_MONTH"/>
-            <column name="availablefrom" value="2025-01-01"/>
-            <column name="availableuntil" value="2025-01-31"/>
-        </insert>
-
-        <insert tableName="product">
-            <column name="name" value="Abonament 10 ședințe 1:1"/>
-            <column name="price" value="800.00"/>
-            <column name="tokenqty" value="10"/>
-            <column name="tokentype" value="ONE_ON_ONE"/>
-            <column name="tokenexpirepolicy" value="TWO_MONTHS"/>
-            <column name="availablefrom" value="2025-01-01"/>
-            <column name="availableuntil" value="2025-01-31"/>
-        </insert>
-
-        <insert tableName="product">
-            <column name="name" value="Abonament 10 ședințe 1:2"/>
-            <column name="price" value="700.00"/>
-            <column name="tokenqty" value="10"/>
-            <column name="tokentype" value="ONE_ON_TWO"/>
-            <column name="tokenexpirepolicy" value="TWO_MONTHS"/>
-            <column name="availablefrom" value="2025-01-01"/>
-            <column name="availableuntil" value="2025-01-31"/>
-        </insert>
-
-        <insert tableName="product">
-            <column name="name" value="sedinta barter"/>
-            <column name="price" value="0.00"/>
-            <column name="tokenqty" value="1"/>
-            <column name="tokentype" value="BARTER"/>
-            <column name="tokenexpirepolicy" value="NONE"/>
-            <column name="availablefrom" value="2025-01-01"/>
-            <column name="availableuntil" value="2025-12-31"/>
-        </insert>
-
-        <insert tableName="product">
-            <column name="name" value="voucher cadou 10 sedinte"/>
-            <column name="price" value="0.00"/>
-            <column name="tokenqty" value="10"/>
-            <column name="tokentype" value="BARTER"/>
-            <column name="tokenexpirepolicy" value="NONE"/>
-            <column name="availablefrom" value="2025-01-01"/>
-            <column name="availableuntil" value="2025-12-31"/>
-        </insert>
-
+        <loadData tableName="product" file="db/data/products-01.csv" separator=",">
+            <column name="name" type="string"/>
+            <column name="price" type="numeric"/>
+            <column name="tokenqty" type="numeric"/>
+            <column name="tokentype" type="string"/>
+            <column name="tokenexpirepolicy" type="string"/>
+            <column name="availablefrom" type="date"/>
+            <column name="availableuntil" type="date"/>
+        </loadData>
     </changeSet>
+
+    <changeSet id="populate-feb-products-from-csv" author="vlad">
+        <loadData tableName="product" file="db/data/products-02.csv" separator=",">
+            <column name="name" type="string"/>
+            <column name="price" type="numeric"/>
+            <column name="tokenqty" type="numeric"/>
+            <column name="tokentype" type="string"/>
+            <column name="tokenexpirepolicy" type="string"/>
+            <column name="availablefrom" type="date"/>
+            <column name="availableuntil" type="date"/>
+        </loadData>
+    </changeSet>
+
 </databaseChangeLog>

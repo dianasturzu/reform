@@ -1,0 +1,9 @@
+name,price,tokenqty,tokentype,tokenexpirepolicy,availablefrom,availableuntil
+sedinta 1:1,100.00,1,ONE_ON_ONE,NONE,2025-01-01,2025-01-31
+sedinta 1:2,85.00,1,ONE_ON_TWO,NONE,2025-01-01,2025-01-31
+abonament 5 sedinte 1:1,450.00,5,ONE_ON_ONE,ONE_MONTH,2025-01-01,2025-01-31
+abonament 5 sedinte 1:2,375.00,5,ONE_ON_TWO,ONE_MONTH,2025-01-01,2025-01-31
+abonament 10 sedinte 1:1,800.00,10,ONE_ON_ONE,TWO_MONTHS,2025-01-01,2025-01-31
+abonament 10 sedinte 1:2,700.00,10,ONE_ON_TWO,TWO_MONTHS,2025-01-01,2025-02-28
+sedinta barter,0.00,1,BARTER,NONE,2025-01-01,2025-12-31
+voucher cadou 10 sedinte,0.00,10,BARTER,NONE,2025-01-01,2025-12-31

@@ -116,7 +116,7 @@ public class SessionSyncService {
             log.info("✅ New subscription started for client {}. First session recorded.", client.getName());
 
         } else {
-            // Client is using an existing token
+            // Client is using an existing subscription
             Token consumedToken = tokenService.consumeToken(client, sessionDate);
             Session session = new Session(sessionDate, client, instructor, consumedToken);
 
